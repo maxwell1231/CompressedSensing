@@ -1,14 +1,23 @@
+"""An iterative algorithm for Set Query.
+
+Author: Maxwell Pang (maxwell.amao@gmail.com)
+"""
+
 import math
 import random
 import numpy as np
 from itertools import permutations
 
-"""
-Input: Number of buckets
-Output: Hash function
-Maxwell
-"""
+
 def getH(B):
+  """Returns a hash function used in creating phi.
+
+  Args:
+    B: number of buckets.
+
+  Returns:
+    A pair-wise independent hash function mapping integers to range(B).
+  """
   a = random.randint(0, B//2 - 1) * 2 + 1
   b = random.randint(0, B - 1)
   return lambda x: (a * x + b) % B
