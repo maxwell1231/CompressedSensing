@@ -61,25 +61,40 @@ def createPhi(h, sigma, n, B):
   phi[np.arrange(n), H] = 1
   phi *= G
   return phi
-      
 
-def iterativeSetQuery(eps, k, n, B):
-  # Start of initialization
-  c = 20
-  gamma = 1/600
-  klist = []
-  epslist = []
-  blist = []
-  for i in range(1, math.log(k, 2) + 1):
-    klist.append(k * (gamma ** i))
-    epslist.append(eps * ((10 * gamma) ** i))
-    blist.append(c * klist[-1] / epslist[-1])
-  m = 0
-  for i in blist:
-    m += i
-  h = getH(B) # Create multiple hash functions and store in a list
-  sigma = getSigma(n)
-  phi = createPhi(h, sigma, n, B)
+
+class IterativeSetQuery:
+  def __init__(self, eps, k, n, B):
+    self.c = 20
+    self.gamma = 1/600
+    self.klist = []
+    self.epslist = []
+    self.blist = []
+    self.num_blocks = math.log(k, 2)
+    for i in range(1, self.num_blocks + 1):
+      self.klist.append(k * (self.gamma ** i))
+      self.epslist.append(self.eps * ((10 * self.gamma) ** i))
+      self.blist.append(self.c * self.klist[-1] / self.epslist[-1])
+    self.m = 0
+    for i in self.blist:
+      self.m += i
+    self.hlist = [] # Keeps track of all the hash functions
+    self.sigmalist = [] # Keeps track of all the other hash functions
+    self.philist = [] # Keeps track of all the arrays made by hash function pairs
+    for i in range(self.num_blocks):
+      h = getH(B) # Creates a hash function
+      self.hlist.append(h)
+      sigma = getSigma(n)
+      self.sigmalist.append(sigma)
+      phi = createPhi(h, sigma, n, B)
+      self.philist.append(phi)
+    
+  def measure(self, x):
+    return y
+
+  def query(self, y):
+    return xprime
+
   # Make separate function to create x and S
   xh = [0] * n # Helper for x
   perm = permutations(range(1, n+1)) # Decide which k indices are non-zero
@@ -87,15 +102,15 @@ def iterativeSetQuery(eps, k, n, B):
     xh[perm[i]] = 1
   x = np.array(xh)
   S = perm[:k] # The list of non-zero indices
-  y = np.dot(phi, x)
+  y += np.dot(philist[i], x) for i in range(num_blocks)
   # End of initialization
   
   xprime = [0] * n # 
-  for j in range(1, math.log(k, 2) + 1):
+  for j in range(1, num_blocks + 1):
     T = [] # T is the list of indices that don't have any collisions
     goodbucks = [] # The list of good buckets
     counter = {} # Counts number of collisions for each bucket
-    hprime = getH(B) # Hash function for this iteration, should be fixed with above
+    hprime = hlist[i-1] # Hash function for this iteration, should be fixed with above
     for i in range(B):
       counter[i] = 0
     for i in S:
