@@ -90,50 +90,58 @@ class IterativeSetQuery:
       self.philist.append(phi)
     
   def measure(self, x):
-    return y
+    y = [0] * self.m
+    for i in range(self.num_blocks):
+      helper = np.dot(self.philist[i], x)
+      for j in range(self.m):
+        y[m] += helper[m]
+    return np.array(y)
 
-  def query(self, y):
+  def query(self, y, S):
+    xprime = [0] * n # 
+    for j in range(1, self.num_blocks + 1):
+      T = [] # T is the list of indices that don't have any collisions
+      goodbucks = [] # The list of good buckets
+      counter = {} # Counts number of collisions for each bucket
+      hprime = self.hlist[j-1] # Hash function for this iteration, should be fixed with above
+      for i in range(B):
+        counter[i] = 0
+      for i in S:
+        counter[hprime(i)] += 1
+      for i in range(B):
+        if counter[i] == 1:
+          goodbucks.append(i)
+      for i in S:
+        if hprime(i) in goodbucks:
+          T.append(i)
+        l = 0 # Change this to initialize before for loop
+        for k in range(j-2):
+          l += blist[k]
+          xhat = [0] * n
+      for i in T:
+        xhat[i] = y[l + hprime(i)] # Need to use sigma here
+        S.remove(i)
+        y = y - np.dot(phi, np.array(xhat)) # Need to make this faster, matrix multiplication bad
+    xprime[i for i in T] = xhat[i]
     return xprime
 
-  # Make separate function to create x and S
-  xh = [0] * n # Helper for x
-  perm = permutations(range(1, n+1)) # Decide which k indices are non-zero
-  for i in range(k): # Make the values the same
-    xh[perm[i]] = 1
-  x = np.array(xh)
-  S = perm[:k] # The list of non-zero indices
-  y += np.dot(philist[i], x) for i in range(num_blocks)
-  # End of initialization
-  
-  xprime = [0] * n # 
-  for j in range(1, num_blocks + 1):
-    T = [] # T is the list of indices that don't have any collisions
-    goodbucks = [] # The list of good buckets
-    counter = {} # Counts number of collisions for each bucket
-    hprime = hlist[i-1] # Hash function for this iteration, should be fixed with above
-    for i in range(B):
-      counter[i] = 0
-    for i in S:
-      counter[hprime(i)] += 1
-    for i in range(B):
-      if counter[i] == 1:
-        goodbucks.append(i)
-    for i in S:
-      if hprime(i) in goodbucks:
-        T.append(i)
-    l = 0 # Change this to initialize before for loop
-    for k in range(j-2):
-      l += blist[k]
-    xhat = [0] * n
-    for i in T:
-      xhat[i] = y[l + hprime(i)] # Need to use sigma here
-      S.remove(i)
-    y = y - np.dot(phi, np.array(xhat)) # Need to make this faster, matrix multiplication bad
-    xprime[i for i in T] = xhat[i]
-  return xprime
-    
-    
-  
 
-testH()
-testSigma()
+  # How can I make it so that S is both used in constructing x but also in retrieving x; does it have to appear both in the function and class??
+
+# Make separate function to create x and S
+def create(x, philist, S, num_blocks, m):
+  xh = [0] * n # Helper for x
+  for i in S: # Make the values the same
+    xh[i] = 1
+  x = np.array(xh)
+  y = [0] * m
+  for i in range(num_blocks):
+    prod = np.dot(philist[i], x)
+    for j in range(m):
+      y[j] += prod[j]
+  realy = np.array(y)
+  return realy
+
+def makePerm(n, k):
+  perm = permutations(range(n))
+  return perm[:k]
