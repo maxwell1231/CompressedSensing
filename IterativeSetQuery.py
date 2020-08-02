@@ -22,6 +22,14 @@ def getH(B):
   return lambda x: (a * x + b) % B
 
 def testH():
+  """Tests a hash function used in creating phi.
+
+  Args:
+    None.
+
+  Returns:
+    None.
+  """
   h = getH(2 ** 10)
   results = [0] * 1024
   for i in range(2 ** 10):
@@ -40,11 +48,27 @@ def testH():
 
   
 def getSigma(n):
+  """Returns a hash function used in creating phi.
+
+  Args:
+    n: length of x.
+
+  Returns:
+    A hash function mapping range(n) to 1 or -1.
+  """
   k = random.randint(0, 2 ** n - 1)
   return lambda x : (((k >> x) % 2) - .5) * 2
 
 
 def testSigma():
+  """Tests a hash function used in creating phi.
+
+  Args:
+    None.
+
+  Returns:
+    None.
+  """
   sigma = getSigma(2 ** 10)
   numOnes = 0
   for i in range(2 ** 10):
@@ -52,7 +76,8 @@ def testSigma():
       numOnes += 1
   assert numOnes > 2**9 - 64
   assert numOnes < 2**9 + 64
-  
+
+# Not used, invalid syntax  
 def createPhi(h, sigma, n, B):
   H = [h(i) for i in range(n)]
   G = [sigma(i) for i in range(n)]
@@ -63,7 +88,18 @@ def createPhi(h, sigma, n, B):
 
 
 class IterativeSetQuery:
+  """Creates a class to set up and solve compressed sensing."""
   def __init__(self, eps, k, n):
+    """Initializes the parameters.
+
+    Args:
+      eps: A variable relating to error bound.
+      k: The number of non-zero indices.
+      n: The length of x.
+
+    Returns:
+      Nothing.
+    """
     self.c = 20
     self.gamma = 1./600
     self.klist = []
@@ -87,6 +123,14 @@ class IterativeSetQuery:
       self.sigmalist.append(sigma)
     
   def measure(self, x):
+    """Creates y from x.
+
+    Args:
+      x: A k-sparse vector.
+
+    Returns:
+      The product of phi and x.
+    """
     y = []
     for j in range(self.num_blocks):
       t = [0] * self.blist[j]
@@ -96,8 +140,18 @@ class IterativeSetQuery:
     return np.array(y)
 
   def query(self, y, S):
+    """Finds x from y and the list of non-zero indices.
+
+    Args:
+      y: The product of phi and x.
+      S: The list of non-zero indices.
+
+    Returns:
+      An approximation for x based on y and S.
+    """
     xprime = {}
     print("blist=%s" % self.blist)
+    l = 0 # Length of indices we need to skip
     for j in range(self.num_blocks):
       T = [] # T is the list of indices that don't have any collisions
       goodbucks = [] # The list of good buckets
@@ -114,15 +168,13 @@ class IterativeSetQuery:
       for i in S:
         if hprime(i) in goodbucks:
           T.append(i)
-      l = 0 # Change this to initialize before for loop
-      for k in range(j):
-        l += self.blist[k]
       print("l=%d" % l)
       xhat = {}
       for i in T:
         xhat[i] = y[l + hprime(i)] * self.sigmalist[j](i)
         S.remove(i)
         y = y - self.measure(xhat) # Need to make this faster, matrix multiplication bad
+      l += self.blist[j]
       for i in T:
         xprime[i] = xhat[i]
     return xprime
@@ -130,7 +182,7 @@ class IterativeSetQuery:
 
   # How can I make it so that S is both used in constructing x but also in retrieving x; does it have to appear both in the function and class??
 
-# Make separate function to create x and S
+# Not used
 def create(x, philist, S, num_blocks, m):
   xh = [0] * n # Helper for x
   for i in S: # Make the values the same
@@ -146,10 +198,28 @@ def create(x, philist, S, num_blocks, m):
 
 
 def createX(n, S):
+  """Creates an x.
+
+  Args:
+    n: The length of x.
+    S: The list of non-zero indices.
+
+  Returns:
+    A k-sparse vector of length n.
+  """
   return {i: 1. for i in S}
 
 
 def makePerm(n, k):
+  """Returns a random list of k integers from 0 to n - 1.
+
+  Args:
+    n: The range to choose from.
+    k: The length of the list.
+
+  Returns:
+    A random list of k integers from 0 to n - 1.
+  """
   result = np.random.permutation(n)
   return set(result[:k])
 
