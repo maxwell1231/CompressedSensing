@@ -6,7 +6,6 @@ Author: Maxwell Pang (maxwell.amao@gmail.com)
 import math
 import random
 import numpy as np
-from itertools import permutations
 
 
 def getH(B):
@@ -42,7 +41,7 @@ def testH():
   
 def getSigma(n):
   k = random.randint(0, 2 ** n - 1)
-  return lambda x : (((k // (2 ** x)) % 2) - .5) * 2
+  return lambda x : (((k >> x) % 2) - .5) * 2
 
 
 def testSigma():
@@ -64,17 +63,17 @@ def createPhi(h, sigma, n, B):
 
 
 class IterativeSetQuery:
-  def __init__(self, eps, k, n, B):
+  def __init__(self, eps, k, n):
     self.c = 20
-    self.gamma = 1/600
+    self.gamma = 1./600
     self.klist = []
     self.epslist = []
     self.blist = []
-    self.num_blocks = math.log(k, 2)
+    self.num_blocks = int(math.log(k, 2))
     for i in range(1, self.num_blocks + 1):
       self.klist.append(k * (self.gamma ** i))
-      self.epslist.append(self.eps * ((10 * self.gamma) ** i))
-      self.blist.append(self.c * self.klist[-1] / self.epslist[-1])
+      self.epslist.append(eps * ((10 * self.gamma) ** i))
+      self.blist.append(int(self.c * self.klist[-1] / self.epslist[-1]))
     self.m = 0
     for i in self.blist:
       self.m += i
@@ -82,28 +81,29 @@ class IterativeSetQuery:
     self.sigmalist = [] # Keeps track of all the other hash functions
     self.philist = [] # Keeps track of all the arrays made by hash function pairs
     for i in range(self.num_blocks):
-      h = getH(B) # Creates a hash function
+      h = getH(self.blist[i]) # Creates a hash function
       self.hlist.append(h)
       sigma = getSigma(n)
       self.sigmalist.append(sigma)
-      phi = createPhi(h, sigma, n, B)
-      self.philist.append(phi)
     
   def measure(self, x):
-    y = [0] * self.m
-    for i in range(self.num_blocks):
-      helper = np.dot(self.philist[i], x)
-      for j in range(self.m):
-        y[m] += helper[m]
+    y = []
+    for j in range(self.num_blocks):
+      t = [0] * self.blist[j]
+      for i in x:
+        t[self.hlist[j](i)] += x[i] * self.sigmalist[j](i)
+      y.extend(t)
     return np.array(y)
 
   def query(self, y, S):
-    xprime = [0] * n # 
-    for j in range(1, self.num_blocks + 1):
+    xprime = {}
+    print("blist=%s" % self.blist)
+    for j in range(self.num_blocks):
       T = [] # T is the list of indices that don't have any collisions
       goodbucks = [] # The list of good buckets
       counter = {} # Counts number of collisions for each bucket
-      hprime = self.hlist[j-1] # Hash function for this iteration, should be fixed with above
+      hprime = self.hlist[j] # Hash function for this iteration, should be fixed with above
+      B = self.blist[j]
       for i in range(B):
         counter[i] = 0
       for i in S:
@@ -114,15 +114,17 @@ class IterativeSetQuery:
       for i in S:
         if hprime(i) in goodbucks:
           T.append(i)
-        l = 0 # Change this to initialize before for loop
-        for k in range(j-2):
-          l += blist[k]
-          xhat = [0] * n
+      l = 0 # Change this to initialize before for loop
+      for k in range(j):
+        l += self.blist[k]
+      print("l=%d" % l)
+      xhat = {}
       for i in T:
-        xhat[i] = y[l + hprime(i)] # Need to use sigma here
+        xhat[i] = y[l + hprime(i)] * self.sigmalist[j](i)
         S.remove(i)
-        y = y - np.dot(phi, np.array(xhat)) # Need to make this faster, matrix multiplication bad
-    xprime[i for i in T] = xhat[i]
+        y = y - self.measure(xhat) # Need to make this faster, matrix multiplication bad
+      for i in T:
+        xprime[i] = xhat[i]
     return xprime
 
 
@@ -142,6 +144,24 @@ def create(x, philist, S, num_blocks, m):
   realy = np.array(y)
   return realy
 
+
+def createX(n, S):
+  return {i: 1. for i in S}
+
+
 def makePerm(n, k):
-  perm = permutations(range(n))
-  return perm[:k]
+  result = np.random.permutation(n)
+  return set(result[:k])
+
+n = 100
+k = 10
+S = makePerm(n, k)
+x = createX(n, S)
+print("X = %s, S = %s" % (x, S))
+
+isq = IterativeSetQuery(eps=.1, k=k, n=n)
+y = isq.measure(x)
+print("Y = %s" % y)
+
+xprime = isq.query(y, S)
+print("Approximate of X = %s" % xprime)
