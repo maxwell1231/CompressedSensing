@@ -6,6 +6,7 @@ Author: Maxwell Pang (maxwell.amao@gmail.com)
 import math
 import random
 import numpy as np
+import time
 
 
 def getH(B):
@@ -17,7 +18,8 @@ def getH(B):
   Returns:
     A pair-wise independent hash function mapping integers to range(B).
   """
-  a = random.randint(0, B//2 - 1) * 2 + 1
+  print("B is %s" % B)
+  a = random.randint(0, B - 1) * 2 + 1
   b = random.randint(0, B - 1)
   return lambda x: (a * x + b) % B
 
@@ -56,8 +58,8 @@ def getSigma(n):
   Returns:
     A hash function mapping range(n) to 1 or -1.
   """
-  k = random.randint(0, 2 ** n - 1)
-  return lambda x : (((k >> x) % 2) - .5) * 2
+  k = random.randint(0, n - 1)
+  return lambda x : (hash(str((x + k) % n)) % 2) * 2 - 1
 
 
 def testSigma():
@@ -102,14 +104,11 @@ class IterativeSetQuery:
     """
     self.c = 20
     self.gamma = 1./600
-    self.klist = []
-    self.epslist = []
     self.blist = []
-    self.num_blocks = int(math.log(k, 2))
+    self.num_blocks = int(math.log(k, 10))
     for i in range(1, self.num_blocks + 1):
-      self.klist.append(k * (self.gamma ** i))
-      self.epslist.append(eps * ((10 * self.gamma) ** i))
-      self.blist.append(int(self.c * self.klist[-1] / self.epslist[-1]))
+      eps *= 10
+      self.blist.append(int(self.c * k / eps) + 1)
     self.m = 0
     for i in self.blist:
       self.m += i
@@ -122,7 +121,7 @@ class IterativeSetQuery:
       sigma = getSigma(n)
       self.sigmalist.append(sigma)
     
-  def measure(self, x):
+  def measure(self, x, start_block=0):
     """Creates y from x.
 
     Args:
@@ -132,7 +131,7 @@ class IterativeSetQuery:
       The product of phi and x.
     """
     y = []
-    for j in range(self.num_blocks):
+    for j in range(start_block, self.num_blocks):
       t = [0] * self.blist[j]
       for i in x:
         t[self.hlist[j](i)] += x[i] * self.sigmalist[j](i)
@@ -151,32 +150,26 @@ class IterativeSetQuery:
     """
     xprime = {}
     print("blist=%s" % self.blist)
-    l = 0 # Length of indices we need to skip
     for j in range(self.num_blocks):
-      T = [] # T is the list of indices that don't have any collisions
-      goodbucks = [] # The list of good buckets
       counter = {} # Counts number of collisions for each bucket
       hprime = self.hlist[j] # Hash function for this iteration, should be fixed with above
       B = self.blist[j]
-      for i in range(B):
-        counter[i] = 0
-      for i in S:
-        counter[hprime(i)] += 1
-      for i in range(B):
-        if counter[i] == 1:
-          goodbucks.append(i)
-      for i in S:
-        if hprime(i) in goodbucks:
-          T.append(i)
-      print("l=%d" % l)
       xhat = {}
-      for i in T:
-        xhat[i] = y[l + hprime(i)] * self.sigmalist[j](i)
+      removable = []
+      for i in S:
+        hashv = hprime(i)
+        if hashv in counter:
+          counter[hashv] = False
+        else:
+          counter[hashv] = True
+      for i in S:
+        hashv = hprime(i)
+        if counter.get(hashv, False):
+          xprime[i] = xhat[i] = y[hprime(i)] * self.sigmalist[j](i)
+          removable.append(i)
+      for i in removable:
         S.remove(i)
-        y = y - self.measure(xhat) # Need to make this faster, matrix multiplication bad
-      l += self.blist[j]
-      for i in T:
-        xprime[i] = xhat[i]
+      y = y[B:] - self.measure(xhat, start_block=j+1)
     return xprime
 
 
@@ -223,15 +216,26 @@ def makePerm(n, k):
   result = np.random.permutation(n)
   return set(result[:k])
 
-n = 100
-k = 10
+n = 100000000
+k = 1024
 S = makePerm(n, k)
 x = createX(n, S)
-print("X = %s, S = %s" % (x, S))
+print("X = %s\nS = %s" % (x, S))
 
 isq = IterativeSetQuery(eps=.1, k=k, n=n)
 y = isq.measure(x)
 print("Y = %s" % y)
 
+tic = time.perf_counter()
 xprime = isq.query(y, S)
+toc = time.perf_counter()
 print("Approximate of X = %s" % xprime)
+print("Amount of time = %s" % ((toc - tic) * 1e6))
+
+# Notes for next time
+# Plot phi, results after each execution
+# Try half 1, half -1 instead of all 1
+# S could just have intersection with some of the non-zero indices
+# Check edge cases
+# Measure time and space used, use timer.start??
+# Make separate documents for inputs and outputs
