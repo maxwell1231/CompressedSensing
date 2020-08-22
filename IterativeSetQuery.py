@@ -7,6 +7,8 @@ import math
 import random
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 
 def getH(B):
@@ -148,6 +150,7 @@ class IterativeSetQuery:
     Returns:
       An approximation for x based on y and S.
     """
+    S = set(S)
     xprime = {}
     print("blist=%s" % self.blist)
     for j in range(self.num_blocks):
@@ -172,22 +175,28 @@ class IterativeSetQuery:
       y = y[B:] - self.measure(xhat, start_block=j+1)
     return xprime
 
+  def createRep(self, S):
+    Sp = list(S)
+    Sp.sort()
+    print("Sp is %s" % Sp)
+    phiArr = []
+    for i in range(self.m):
+      phiArr.append([0] * len(Sp))
+    print("The number of blocks is %s" % self.num_blocks)
+    print("Phi array looks like %s" % phiArr)
+    l = 0
+    for i in range(self.num_blocks):
+      for j in range(len(Sp)):
+        s_j = Sp[j]
+        hashv = self.hlist[i](s_j)
+        print("%s, %s" % (j, l + hashv))
+        phiArr[l + hashv][j] = self.sigmalist[i](s_j)
+      l += self.blist[i]
+    return phiArr
+    
+
 
   # How can I make it so that S is both used in constructing x but also in retrieving x; does it have to appear both in the function and class??
-
-# Not used
-def create(x, philist, S, num_blocks, m):
-  xh = [0] * n # Helper for x
-  for i in S: # Make the values the same
-    xh[i] = 1
-  x = np.array(xh)
-  y = [0] * m
-  for i in range(num_blocks):
-    prod = np.dot(philist[i], x)
-    for j in range(m):
-      y[j] += prod[j]
-  realy = np.array(y)
-  return realy
 
 
 def createX(n, S):
@@ -216,8 +225,8 @@ def makePerm(n, k):
   result = np.random.permutation(n)
   return set(result[:k])
 
-n = 100000000
-k = 1024
+n = 10000000
+k = 100
 S = makePerm(n, k)
 x = createX(n, S)
 print("X = %s\nS = %s" % (x, S))
@@ -231,6 +240,15 @@ xprime = isq.query(y, S)
 toc = time.perf_counter()
 print("Approximate of X = %s" % xprime)
 print("Amount of time = %s" % ((toc - tic) * 1e6))
+
+phirep = isq.createRep(S)
+print("Phi array looks like %s" % phirep)
+
+data = np.array(phirep)
+cmap = plt.cm.bwr
+norm = plt.Normalize(vmin=data.min(), vmax=data.max())
+image = cmap(norm(data))
+plt.imsave('isqphi.png', image)
 
 # Notes for next time
 # Plot phi, results after each execution
