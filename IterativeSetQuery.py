@@ -11,6 +11,13 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
 
+DEBUGGING = False
+
+def debug_print(*args, **kwargs):
+  if DEBUGGING:
+    print(*args, **kwargs)
+
+
 def getH(B):
   """Returns a hash function used in creating phi.
 
@@ -91,6 +98,13 @@ def createPhi(h, sigma, n, B):
   return phi
 
 
+class Measurement:
+
+  def __init__(self, m):
+    self.y = np.array([0] * m)
+    self.S = set()
+
+
 class IterativeSetQuery:
   """Creates a class to set up and solve compressed sensing."""
   def __init__(self, eps, k, n):
@@ -127,7 +141,7 @@ class IterativeSetQuery:
     """Creates y from x.
 
     Args:
-      x: A k-sparse vector.
+      x: A k-sparse vector represented by a dict.
 
     Returns:
       The product of phi and x.
@@ -140,7 +154,20 @@ class IterativeSetQuery:
       y.extend(t)
     return np.array(y)
 
-  def query(self, y, S):
+  def new_measurement(self):
+    return Measurement(m=self.m)
+
+  def update(self, measurement, val, pos):
+    measurement.S.add(pos)
+    ny = []
+    for j in range(0, self.num_blocks):
+      t = [0] * self.blist[j]
+      t[self.hlist[j](pos)] = val * self.sigmalist[j](pos)
+      ny.extend(t)
+    measurement.y = measurement.y + np.array(ny)
+    return measurement
+
+  def query(self, measurement):
     """Finds x from y and the list of non-zero indices.
 
     Args:
@@ -150,7 +177,8 @@ class IterativeSetQuery:
     Returns:
       An approximation for x based on y and S.
     """
-    S = set(S)
+    y = measurement.y
+    S = set(measurement.S)
     xprime = {}
     print("blist=%s" % self.blist)
     for j in range(self.num_blocks):
@@ -162,34 +190,36 @@ class IterativeSetQuery:
       for i in S:
         hashv = hprime(i)
         if hashv in counter:
-          counter[hashv] = False
+          counter[hashv] = False # Has appeared before, means collision
         else:
-          counter[hashv] = True
+          counter[hashv] = True # Appears for the first time
       for i in S:
         hashv = hprime(i)
-        if counter.get(hashv, False):
+        if counter.get(hashv, False): # Checks if the bucket doesn't have collisions
           xprime[i] = xhat[i] = y[hprime(i)] * self.sigmalist[j](i)
           removable.append(i)
       for i in removable:
         S.remove(i)
       y = y[B:] - self.measure(xhat, start_block=j+1)
+    if len(S) != 0:
+      print("Uh oh, S is %s" % S)
     return xprime
 
   def createRep(self, S):
     Sp = list(S)
     Sp.sort()
-    print("Sp is %s" % Sp)
+    debug_print("Sp is %s" % Sp)
     phiArr = []
     for i in range(self.m):
       phiArr.append([0] * len(Sp))
-    print("The number of blocks is %s" % self.num_blocks)
-    print("Phi array looks like %s" % phiArr)
+    debug_print("The number of blocks is %s" % self.num_blocks)
+    debug_print("Phi array looks like %s" % phiArr)
     l = 0
     for i in range(self.num_blocks):
       for j in range(len(Sp)):
         s_j = Sp[j]
         hashv = self.hlist[i](s_j)
-        print("%s, %s" % (j, l + hashv))
+        debug_print("%s, %s" % (j, l + hashv))
         phiArr[l + hashv][j] = self.sigmalist[i](s_j)
       l += self.blist[i]
     return phiArr
@@ -226,34 +256,50 @@ def makePerm(n, k):
   return set(result[:k])
 
 n = 10000000
-k = 100
+k = 1024
 S = makePerm(n, k)
 x = createX(n, S)
-print("X = %s\nS = %s" % (x, S))
+debug_print("X = %s\nS = %s" % (x, S))
 
 isq = IterativeSetQuery(eps=.1, k=k, n=n)
-y = isq.measure(x)
-print("Y = %s" % y)
+me = isq.new_measurement()
+totaltime = 0.
+for i in x:
+  tic = time.perf_counter()
+  me = isq.update(me, val=x[i], pos=i)
+  toc = time.perf_counter()
+  totaltime += toc - tic
+print("Average update time = %s us" % (totaltime / k * 1e6))
+debug_print("Y = %s" % me.y)
 
 tic = time.perf_counter()
-xprime = isq.query(y, S)
+xprime = isq.query(me)
 toc = time.perf_counter()
-print("Approximate of X = %s" % xprime)
-print("Amount of time = %s" % ((toc - tic) * 1e6))
+debug_print("Approximate of X = %s" % xprime)
+if xprime == x:
+  print("We succeeded!")
+else:
+  print("We failed.")
+print("query time = %s us" % ((toc - tic) * 1e6))
 
-phirep = isq.createRep(S)
-print("Phi array looks like %s" % phirep)
 
-data = np.array(phirep)
-cmap = plt.cm.bwr
-norm = plt.Normalize(vmin=data.min(), vmax=data.max())
-image = cmap(norm(data))
-plt.imsave('isqphi.png', image)
+def graph(isq):
+  phirep = isq.createRep(S)
+  debug_print("Phi array looks like %s" % phirep)
+  
+  data = np.array(phirep)
+  cmap = plt.cm.bwr
+  norm = plt.Normalize(vmin=data.min(), vmax=data.max())
+  image = cmap(norm(data))
+  plt.imsave('isqphi.png', image)
 
 # Notes for next time
 # Plot phi, results after each execution
 # Try half 1, half -1 instead of all 1
 # S could just have intersection with some of the non-zero indices
 # Check edge cases
-# Measure time and space used, use timer.start??
+# Measure update time and space
 # Make separate documents for inputs and outputs
+
+# Plot the naive implementation and this implementation on a graph about efficiency
+# Try to recover the inputs of training data using a neural network
