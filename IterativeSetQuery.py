@@ -158,13 +158,21 @@ class IterativeSetQuery:
     return Measurement(m=self.m)
 
   def update(self, measurement, val, pos):
+    """Updates y from a stream of values and positions.
+
+    Args:
+      measurement: the current y and S
+      val: the value at an index in x
+      pos: the position of the index in x
+
+    Returns:
+      An updated measurement.
+    """
     measurement.S.add(pos)
-    ny = []
+    l = 0
     for j in range(0, self.num_blocks):
-      t = [0] * self.blist[j]
-      t[self.hlist[j](pos)] = val * self.sigmalist[j](pos)
-      ny.extend(t)
-    measurement.y = measurement.y + np.array(ny)
+      measurement.y[l + self.hlist[j](pos)] += val * self.sigmalist[j](pos)
+      l += self.blist[j]
     return measurement
 
   def query(self, measurement):
